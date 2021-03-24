@@ -11,25 +11,25 @@ const scrapingProfile = async ()=>{
     const autoscrollToElement = async function(cssSelector){
 
         var exists = document.querySelector(cssSelector);
-    
+
         while(exists){
             //
             let maxScrollTop = document.body.clientHeight - window.innerHeight;
             let elementScrollTop = document.querySelector(cssSelector).offsetHeight
             let currentScrollTop = window.scrollY
-    
-    
+
+
             if(maxScrollTop == currentScrollTop || elementScrollTop <= currentScrollTop)
                 break;
-    
+
             await wait(32)
-    
+
             let newScrollTop = Math.min(currentScrollTop + 20, maxScrollTop);
             window.scrollTo(0,newScrollTop)
         }
-    
+
         console.log('finish autoscroll to element %s', cssSelector);
-    
+
         return new Promise(function(resolve){
             resolve();
         });
@@ -77,7 +77,7 @@ const scrapingProfile = async ()=>{
         const elementNameProfile = document.querySelector(selector.name)
         const elementNameTitle = document.querySelector(selector.title)
         const elementResume = document.querySelector(selector.resume)
-        
+
         const name = elementNameProfile?.innerText
         const title = elementNameTitle?.innerText
         const resume = elementResume?.innerText
@@ -91,21 +91,21 @@ const scrapingProfile = async ()=>{
         let experiencesRawArray = Array.from(experiencesRawList)
 
         const groupCompaniesList = experiencesRawArray.filter(el=>{
-            let groupCompanyExperience = el.querySelectorAll(selector.groupByCompany.identify)  
+            let groupCompanyExperience = el.querySelectorAll(selector.groupByCompany.identify)
             return groupCompanyExperience.length >0
         })
 
         const uniqueExperienceList = experiencesRawArray.filter(el=>{
-            let groupCompanyExperience = el.querySelectorAll(selector.groupByCompany.identify)  
+            let groupCompanyExperience = el.querySelectorAll(selector.groupByCompany.identify)
             return groupCompanyExperience.length ==0
         })
-        
+
         const experiences = uniqueExperienceList.map(el=>{
             const title = el.querySelector(selector.default.title)?.innerText
             const date = el.querySelector(selector.default.date)?.innerText
             const company = el.querySelector(selector.default.company)?.innerText
             const description = el.querySelector(selector.default.description)?.innerText
-            
+
             return {title,date,company,description}
         })
 
@@ -119,7 +119,7 @@ const scrapingProfile = async ()=>{
                 const title = el.querySelector(selector.groupByCompany.title)?.innerText
                 const date = el.querySelector(selector.groupByCompany.date)?.innerText
                 const description = el.querySelector(selector.groupByCompany.description)?.innerText
-                
+
                 return {title,date,company,description}
             })
 
@@ -134,9 +134,9 @@ const scrapingProfile = async ()=>{
         const educationItems = document.querySelectorAll(selector.list)
         const educationArray = Array.from(educationItems)
         const educations = educationArray.map(el=>{
-            const institution = el.querySelector(selector.institution).innerText
-            const career = el.querySelector(selector.career).innerText
-            const date = el.querySelector(selector.date).innerText
+            const institution = el.querySelector(selector.institution)?.innerText
+            const career = el.querySelector(selector.career)?.innerText
+            const date = el.querySelector(selector.date)?.innerText
             return {institution,career,date}
         })
         return educations
@@ -154,13 +154,13 @@ const scrapingProfile = async ()=>{
         pre.style = stylePre
 
         const button = document.createElement('button')
-        
+
         button.id = "krowdy-button"
         button.style = "background: gray;border: 2px solid;padding: 8px;"
         button.innerText ="Aceptar"
 
         const bodyElement = document.querySelector('div.body')
-        
+
         bodyElement.appendChild(div)
 
         pre.innerText = "Estamos extrayendo la información!!!!"
@@ -168,20 +168,20 @@ const scrapingProfile = async ()=>{
         div.appendChild(button)
         return {div,pre,button}
     }
-    
+
     //Scroll to all information
     const {div,pre,button} = createPopup()
 
     pre.innerText = 'Scaneando el perfil'
     await autoscrollToElement('body')
     await clickOnMoreResume()
-    
+
     //Scraping Complete Profile
     const personalInformation =  await getPersonalInformation()
     const experienceInformation = await getExperienceInformation()
     const educationInformation = await getEducationInformation()
-    
-    
+
+
     pre.innerText = 'Ya tenemos las información del perfil'
     await wait(1000)
 
@@ -194,16 +194,23 @@ const scrapingProfile = async ()=>{
 
         div.remove()
     })
+  return profile
 }
-
 
 
 //Comunication
 (function(){
 chrome.runtime.onConnect.addListener(function(port) {
     port.onMessage.addListener(function(msg) {
-      const {acction} = msg
-      console.log(acction)
-      if (acction=="scraping") scrapingProfile()
+      // const {acction, tabId} = msg;
+      const usersList = document.querySelectorAll("ul.reusable-search__entity-results-list.list-style-none > li > div > div > div > div > a.app-aware-link");
+      let usersListLinks = Array.from(usersList).slice(0, 3).map(e => e.href)
+      let allProfiles = []
+      usersListLinks.forEach(uri =>{
+        chrome.tabs.update({ url: uri }, async () => {
+          allProfiles.push(await scrapingProfile())
+        })
+      })
+      console.log(allProfiles)
     });
   })})();
